@@ -23,7 +23,7 @@
 示例程序在 [demo.ts](https://github.com/nenojs/deno-cqhttp/blob/master/demo.ts)，你可以直接用下面这个命令运行。
 
 ```bash
-deno https://raw.githubusercontent.com/nenojs/deno-cqhttp/master/demo.ts
+deno run https://raw.githubusercontent.com/nenojs/deno-cqhttp/master/demo.ts
 ```
 
 ## 教程
