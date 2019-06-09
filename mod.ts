@@ -59,11 +59,14 @@ class WSReverseAPIResultStore {
 
   async fetch(seq: string): Promise<any> {
     return new Promise((resolve, reject) => {
-      this.emitter.once(seq, resolve);
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         this.emitter.off(seq, resolve);
         reject(new NetworkError('WebSocket API call timeout'));
       }, this.timeout);
+      this.emitter.once(seq, res => {
+        clearTimeout(timer);
+        resolve(res);
+      });
     });
   }
 
