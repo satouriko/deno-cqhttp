@@ -153,7 +153,7 @@ export class CQHttp extends CQEventEmitter {
     }
   }
 
-  async run(host: string, port: number) {
+  async listen(host: string, port: number) {
     for await (const req of serve(`${host}:${port}`)) {
       if (req.url === this.config.ws_reverse_url) {
         this.handleWSReverse(req);

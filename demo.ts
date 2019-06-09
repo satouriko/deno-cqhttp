@@ -36,4 +36,4 @@ bot.on('message.private', async (e, op) => {
   }, 5000);
 });
 
-bot.run('0.0.0.0', 8080);
+bot.listen('0.0.0.0', 8080);

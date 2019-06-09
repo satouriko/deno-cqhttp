@@ -10,6 +10,19 @@
 
 [Deno 安装指南](https://deno.land/manual.html#setup)
 
+**注意！**
+
+> Deno is very much under development. We encourage brave early adopters, but expect bugs large and small. The API is subject to change without notice. 
+
+Deno 现在还处于不稳定阶段，内置 API 和标准库都随时可能会变动，
+因此本项目可能会处于用不了了的状态。
+如果你发现它用不了，请 [通知](https://github.com/nenojs/deno-cqhttp/issues/new) 我。
+
+但是不用担心，Deno 有缓存远程代码的特性，
+所以只要你第一次能用，它就会一直能用，直到你指定 `--reload` 参数为止。
+
+> Remote code is fetched and cached on first execution, and never updated until the code is run with the --reload flag.
+
 ## 通信方式
 
 这个 SDK 只支持 **反向 WebSocket** 作为通信方式。
@@ -115,11 +128,12 @@ await bot.send_private_msg({
 不要忘了启动，这样才运行了 WebSocket 服务端。
 
 ```typescript
-bot.run('0.0.0.0', 8080);
+bot.listen('0.0.0.0', 8080);
 ```
 
 ## API 参考
 
-Deno 生态现在还远远没有发展起来，你甚至无法享受到 IDE 的自动补全。
+虽然本模块是 TypeScript 写的，但由于 Deno 生态还没有发展起来，
+你可能暂时无法利用 IDE 的提示、补全和声明跳转。
 
-不过你可以自行查阅 [源代码](https://github.com/nenojs/deno-cqhttp/blob/master/mod.ts) 作参考。
+你可以查阅 [源代码](https://github.com/nenojs/deno-cqhttp/blob/master/mod.ts) 作参考。
