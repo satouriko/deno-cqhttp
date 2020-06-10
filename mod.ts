@@ -1,12 +1,12 @@
 import Emitter from 'https://raw.githubusercontent.com/Mango/emitter/0.0.7/src/index.js';
-import { ServerRequest, serve } from 'https://deno.land/x/http/server.ts';
-import { Status } from 'https://deno.land/x/http/http_status.ts';
+import { ServerRequest, serve } from 'https://deno.land/std/http/server.ts';
+import { Status } from 'https://deno.land/std/http/http_status.ts';
 import {
   acceptWebSocket,
   isWebSocketCloseEvent,
   WebSocketCloseEvent,
   WebSocket
-} from 'https://deno.land/x/ws/mod.ts';
+} from 'https://deno.land/std/ws/mod.ts';
 
 export interface CQHttpOptions {
   access_token?: string;
@@ -28,15 +28,15 @@ export class ActionFailed extends ApiError {
 }
 
 class CQEventEmitter extends Emitter {
-
-  emit(event: string, ...args) {
+  emit(event: any, ...args: any): this {
     const s = event.split('.');
-    if (s.length === 0) return;
-    for (let i = s.length; i > 0; i--) {
-      super.emit(s.slice(0, i).join('.'), ...args);
+    if (s.length) {
+      for (let i = s.length; i > 0; i--) {
+        super.emit(s.slice(0, i).join('.'), ...args);
+      }
     }
+    return this;
   }
-
 }
 
 function *SequenceGenerator() {
@@ -73,6 +73,16 @@ class WSReverseAPIResultStore {
 
 }
 
+export interface ActionOption {
+  self_id?: number,
+  context?: any,
+  operation?: any
+}
+
+type WSReverseAPIClients = {
+  [key: string]: WebSocket
+}
+
 export class CQHttp extends CQEventEmitter {
 
   [key: string]: any;
@@ -82,7 +92,7 @@ export class CQHttp extends CQEventEmitter {
     ws_reverse_event_url: '/ws/event/',
   };
 
-  private connectedWSReverseAPIClients = {};
+  private connectedWSReverseAPIClients: WSReverseAPIClients = {};
   private resultStore = new WSReverseAPIResultStore();
   private sequenceGenerator = SequenceGenerator();
 
@@ -98,24 +108,24 @@ export class CQHttp extends CQEventEmitter {
         if (property in target) {
           return Reflect.get(target, property);
         } else if (typeof property === 'string') {
-          return (options?) => this.callAction(property, options);
+          return (options?: ActionOption) => this.callAction(property, options);
         }
         return undefined;
       }
     });
   }
 
-  async callAction(action: string, params?: any): Promise<any> {
+  async callAction(action: string, params?: ActionOption): Promise<any> {
     if (params === undefined) params = {};
     let api;
     if (params.self_id) {
-      api = this.connectedWSReverseAPIClients[params.self_id + ''];
+      api = this.connectedWSReverseAPIClients[params.self_id.toString()];
     } else if (Object.values(this.connectedWSReverseAPIClients).length === 1) {
       api = Object.values(this.connectedWSReverseAPIClients)[0];
     }
     if (!api) throw new ApiNotAvailable();
 
-    const echo = this.sequenceGenerator.next().value;
+    const echo = this.sequenceGenerator.next().value || '';
     await api.send(JSON.stringify({
       action,
       params,
@@ -158,7 +168,9 @@ export class CQHttp extends CQEventEmitter {
   }
 
   async listen(host: string, port: number) {
+    console.log('listen ws', this.config);
     for await (const req of serve(`${host}:${port}`)) {
+      console.log('connect', req.method, req.conn.localAddr, req.url);
       if (req.url === this.config.ws_reverse_url) {
         this.handleWSReverse(req);
       } else if (req.url === this.config.ws_reverse_api_url) {
@@ -171,6 +183,7 @@ export class CQHttp extends CQEventEmitter {
 
   private async handleWSReverse(req: ServerRequest) {
     const role = (req.headers.get('X-Client-Role') || '').toLowerCase();
+    console.log('handle event role', role);
     switch (role) {
       case 'event':
         await this.handleWSReverseEvent(req);
@@ -187,9 +200,15 @@ export class CQHttp extends CQEventEmitter {
     try { this.validateWSReverseAccessToken(req); }
     catch { return; }
 
-    const sock = await acceptWebSocket(req);
+    const sock = await acceptWebSocket({
+      conn: req.conn,
+      bufWriter: req.w,
+      bufReader: req.r,
+      headers: req.headers
+    });
     this.onWSReverseConnect('event', req);
-    for await (const ev of sock.receive()) {
+    for await (const ev of sock) {
+      console.log('handle event', ev);
       if (typeof ev === 'string') {
         let m;
         try {
@@ -210,7 +229,8 @@ export class CQHttp extends CQEventEmitter {
 
     const sock = await this.addWSReverseAPIConnection(req);
     this.onWSReverseConnect('api', req);
-    for await (const ev of sock.receive()) {
+    for await (const ev of sock) {
+      console.log('handle api', ev);
       if (typeof ev === 'string') {
         let m;
         try {
@@ -233,7 +253,8 @@ export class CQHttp extends CQEventEmitter {
 
     const sock = await this.addWSReverseAPIConnection(req);
     this.onWSReverseConnect('universal', req);
-    for await (const ev of sock.receive()) {
+    for await (const ev of sock) {
+      console.log('handle universal', ev);
       if (typeof ev === 'string') {
         let m;
         try {
@@ -271,7 +292,12 @@ export class CQHttp extends CQEventEmitter {
   }
 
   private async addWSReverseAPIConnection(req: ServerRequest): Promise<WebSocket> {
-    const sock = await acceptWebSocket(req);
+    const sock = await acceptWebSocket({
+      conn: req.conn,
+      bufWriter: req.w,
+      bufReader: req.r,
+      headers: req.headers
+    });
     const self_id = req.headers.get('X-Self-ID') || '*';
     this.connectedWSReverseAPIClients[self_id] = sock;
     return sock;
@@ -302,7 +328,7 @@ export class CQHttp extends CQEventEmitter {
     if (payload.sub_type) {
       event = `${event}.${payload.sub_type}`;
     }
-    this.emit(event, payload, async response => await this.handleQuickOperation(payload, response));
+    this.emit(event, payload, async (response: any) => await this.handleQuickOperation(payload, response));
   }
 
 }
